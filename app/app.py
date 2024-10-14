@@ -12,28 +12,35 @@ import os
 
 from dotenv import load_dotenv
 
+
+
 load_dotenv()
 app = FastAPI()
 
-# Get the directory of the current script
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 4000))  # Default to 8000 if PORT is not set
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
+# Get the current directory of the script
 current_dir = os.path.dirname(os.path.abspath(__file__))
 nltk_data_dir = os.path.join(current_dir, 'nltk_data')
 
-# Ensure the nltk_data_dir exists
+# Ensure the directory exists
 os.makedirs(nltk_data_dir, exist_ok=True)
 
-# Check if the nltk_data folder is empty
-if not os.listdir(nltk_data_dir):
-    # Download required NLTK resources
-    nltk.download('punkt_tab', download_dir=nltk_data_dir)
+# Set the NLTK data path
+nltk.data.path.append(nltk_data_dir)
+
+# Load the necessary NLTK resources only if not already present
+try:
+    nltk.data.find('tokenizers/punkt')
+    nltk.data.find('corpora/stopwords')
+except LookupError:
+    print("Downloading NLTK resources...")
+    nltk.download('punkt', download_dir=nltk_data_dir)
     nltk.download('stopwords', download_dir=nltk_data_dir)
-
-# Load your vector database
-vector_data_base = load()
-
-# Append the nltk_data_dir to nltk's data path
-#nltk.data.path.append(nltk_data_dir)
-# Dependency to get the database session
+    
 def get_db():
     db = SessionLocal()
     try:
