@@ -8,10 +8,28 @@ from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHan
 from langchain_core.documents import Document
 import os
 import numpy as np
-from rake_nltk import Rake
 import nltk
 import pandas as pd
 
+nltk_data_dir = os.path.join(os.path.dirname(__file__), "nltk_data")
+nltk.data.path.append(nltk_data_dir)  # Change directory for finding NLTK data
+
+def download_nltk_resources():
+    resources_to_download = ["stopwords", "punkt"]  # List of required resources
+    for resource in resources_to_download:
+        try:
+            nltk.data.find(f"corpora/{resource}")  # Check for stopwords
+            print(f"{resource} is already downloaded.")
+        except LookupError:
+            print(f"Downloading {resource}...")
+            nltk.download(resource, download_dir=nltk_data_dir)
+
+# Call the function to ensure resources are available
+download_nltk_resources()
+
+# Initialize Rake after ensuring resources are available
+from rake_nltk import Rake
+rake = Rake()
 
 def store_to_df(db):
     doc_dict = db.docstore._dict
@@ -26,9 +44,6 @@ def show_vstore(db):
     dataframe = store_to_df(db)
     print(dataframe)  # Use print() instead of display()
 
-nltk_data_dir = os.path.join(os.path.dirname(__file__), "nltk_data")
-nltk.data.path.append(nltk_data_dir)  # Change directory for finding nltk data
-rake = Rake()
 
 def extract_keywords(query, rake=rake):
     query = query.replace("(", "").replace(")", "")
