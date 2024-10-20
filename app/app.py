@@ -5,7 +5,7 @@ from .models import SessionLocal, Chat
 from datetime import datetime, timedelta, timezone
 import requests
 from .get_stock_data import *
-from .Rag_handler import add_articles, add_tables, add_data, use_RAG_pipeline, delete_data, load, refresh_retriever, show_vstore, is_rag_usefull, extract_keywords
+from .Rag_handler import add_articles, add_tables, add_data, use_RAG_pipeline, delete_data, load, refresh_retriever, show_vstore, is_rag_usefull, extract_keywords, vector_data_base
 import pandas as pd
 import nltk
 import os
@@ -16,11 +16,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 app = FastAPI()
-
+'''
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 4000))  # Default to 8000 if PORT is not set
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port)'''
 
     
 def get_db():

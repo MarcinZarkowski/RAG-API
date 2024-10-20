@@ -10,24 +10,28 @@ import os
 import numpy as np
 import nltk
 import pandas as pd
+'''
+def download_all_nltk_data():
+    # Define the directory where nltk_data should be located
+    nltk_data_dir = os.path.join(os.path.dirname(__file__), "nltk_data")
 
-nltk_data_dir = os.path.join(os.path.dirname(__file__), "nltk_data")
-nltk.data.path.append(nltk_data_dir)  # Change directory for finding NLTK data
+    # Check if nltk_data directory exists, if not, create it
+    if not os.path.exists(nltk_data_dir):
+        print(f"Creating nltk_data directory at {nltk_data_dir}...")
+        os.makedirs(nltk_data_dir, exist_ok=True)
 
-def download_nltk_resources():
-    resources_to_download = ["stopwords", "punkt"]  # List of required resources
-    for resource in resources_to_download:
-        try:
-            nltk.data.find(f"corpora/{resource}")  # Check for stopwords
-            print(f"{resource} is already downloaded.")
-        except LookupError:
-            print(f"Downloading {resource}...")
-            nltk.download(resource, download_dir=nltk_data_dir)
+    # Add the nltk_data directory to nltk's data path
+    nltk.data.path.append(nltk_data_dir)
 
-# Call the function to ensure resources are available
-download_nltk_resources()
+    # Download all NLTK data
+    print(f"Downloading all NLTK data to {nltk_data_dir}...")
+    nltk.download('all', download_dir=nltk_data_dir)
+    print("All NLTK data downloaded.")
 
-# Initialize Rake after ensuring resources are available
+# Call the function to ensure all nltk_data is downloaded
+download_all_nltk_data()
+
+# Initialize Rake after ensuring resources are available'''
 from rake_nltk import Rake
 rake = Rake()
 
@@ -102,7 +106,7 @@ QA_CHAIN_PROMPT = PromptTemplate(
     template=template,
 )
 
-llm = Ollama(model="llama3.2:1b", base_url="https://rag-api-cpg2hhagatdabraj.eastus-01.azurewebsites.net")
+llm = Ollama(model="llama3.2:1b", base_url="https://ollama-api.nicefield-9585e97c.eastus.azurecontainerapps.io")
 qa_chain = RetrievalQA.from_chain_type(
     llm,
     retriever=vector_data_base.as_retriever(),
@@ -256,6 +260,4 @@ def is_rag_usefull(query, data_base):
 ##Return type of similarity_search_with_score():
 ##List[Tuple[Document, float]]
 ##float>=0 and <=1, the closer to 0 the less similar it is
-
-
 
