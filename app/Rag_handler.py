@@ -1,15 +1,18 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
+#from langchain_community.vectorstores import FAISS
+from langchain_qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient
 from langchain_core.prompts import PromptTemplate
 from langchain_community.llms.ollama import Ollama 
 from langchain.chains.retrieval_qa.base import RetrievalQA
-from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHandler
+#from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHandler
 from langchain_core.documents import Document
 import os
 import numpy as np
-import nltk
 import pandas as pd
+from dotenv import load_dotenv
+load_dotenv() # Load environment variables from.env file
 '''
 def download_all_nltk_data():
     # Define the directory where nltk_data should be located
@@ -32,9 +35,8 @@ def download_all_nltk_data():
 download_all_nltk_data()
 
 # Initialize Rake after ensuring resources are available'''
-from rake_nltk import Rake
-rake = Rake()
 
+'''
 def store_to_df(db):
     doc_dict = db.docstore._dict
     data_rows = []
@@ -47,35 +49,7 @@ def store_to_df(db):
 def show_vstore(db):
     dataframe = store_to_df(db)
     print(dataframe)  # Use print() instead of display()
-
-
-def extract_keywords(query, rake=rake):
-    query = query.replace("(", "").replace(")", "")
-    rake.extract_keywords_from_text(query)
-    keywords = list(set(rake.get_ranked_phrases())) 
-    
-    return keywords
-
-def search_with_keywords(query, database):
-    keywords = extract_keywords(query)
-    results = []
-
-    for keyword in keywords:
-        # Perform a similarity search for each keyword
-        search_results = database.similarity_search(keyword, k=2)  # You can adjust the value of k
-        results.extend(search_results)
-
-    # Remove duplicates while preserving order
-    unique_results = []
-    seen = set()
-
-    for doc in results:
-        doc_id = doc.metadata.get("id", doc.page_content)  # Use a unique attribute, like ID or content
-        if doc_id not in seen:
-            seen.add(doc_id)
-            unique_results.append(doc)
-
-    return unique_results
+'''
 
 # Initialize embeddings and database
 embeddings = HuggingFaceEmbeddings(
@@ -83,11 +57,22 @@ embeddings = HuggingFaceEmbeddings(
     model_kwargs={'device': 'cpu', 'trust_remote_code': True},
     encode_kwargs={'normalize_embeddings': True}
 )
+import os
 
+client = QdrantClient(
+    os.getenv("QDRANT_HOST"),
+    api_key=os.getenv("QDRANT_SECRET_KEY")
+)
 
-db_path = os.path.join(os.path.dirname(__file__), "vector_database")
-def load(db_path=db_path):
-    vector_data_base = FAISS.load_local(db_path, embeddings, allow_dangerous_deserialization=True, normalize_L2=True)
+#db_path = os.path.join(os.path.dirname(__file__), "vector_database")
+
+def load():
+
+    vector_data_base = QdrantVectorStore(
+        client=client,
+        collection_name=os.getenv("COLLECTION_NAME"),
+        embedding=embeddings,
+    )
     return vector_data_base
 
 vector_data_base = load()
@@ -106,26 +91,24 @@ QA_CHAIN_PROMPT = PromptTemplate(
     template=template,
 )
 
-llm = Ollama(model="llama3.2:1b", base_url="https://ollama-api.nicefield-9585e97c.eastus.azurecontainerapps.io")
+llm = Ollama(model="llama3.2:1b", base_url=os.getenv("LLAMA_URL"))
 qa_chain = RetrievalQA.from_chain_type(
     llm,
     retriever=vector_data_base.as_retriever(),
     chain_type_kwargs={"prompt": QA_CHAIN_PROMPT},
 )
 
-async def use_RAG_pipeline(query):
-    global vector_data_base 
+async def use_RAG_pipeline(query, context):
+   
     
     
     # Perform enhanced context retrieval
-    enhanced_context = search_with_keywords(query, vector_data_base)
-
-    if not enhanced_context:
-        yield {"event": "error", "message": "No relevant information found"}
+    if not context:
+        yield {"event_type": "error", "message": "No relevant information found"}
         return  # Exit the generator if no context is found
 
     # Combine the retrieved documents' content to form a context string
-    context = "\n".join([doc.page_content for doc in enhanced_context])
+    context = "\n".join([doc.page_content for doc in context])
     
 
     # Prepare the input for the LLM
@@ -153,8 +136,9 @@ async def use_RAG_pipeline(query):
 
    
     
-def refresh_retriever(database:FAISS):
-    retriever = database.as_retriever()
+def refresh_retriever():
+    global vector_data_base
+    retriever = vector_data_base.as_retriever()
     global llm
     global qa_chain
    
@@ -167,7 +151,10 @@ def refresh_retriever(database:FAISS):
     
 
 
-async def add_articles(ticker, data, data_base):
+async def add_articles(ticker, data):
+
+    global vector_data_base
+    
     documents=[]
    
     for title in data.keys():
@@ -180,16 +167,20 @@ async def add_articles(ticker, data, data_base):
         )
         documents.append(document)
     documents=text_splitter.split_documents(documents)
-   
-    temporary=FAISS.from_documents(documents,embeddings)
+    #ids = [str(uuid4()) for _ in range(len(documents))]
+    #temporary=FAISS.from_documents(documents,embeddings)
     
-    data_base.merge_from(temporary)
+    #data_base.merge_from(temporary)
+    ids=vector_data_base.add_documents(documents=documents)
+    print("added articles")
+
+    return ids
 
     
 
-    return data_base
+async def add_data(ticker, data):
+    global vector_data_base
 
-async def add_data(ticker, data, data_base):
     documents=[]
     for variable, value in data.items():
         
@@ -202,18 +193,20 @@ async def add_data(ticker, data, data_base):
         documents.append(document)
 
     
-    temporary=FAISS.from_documents(documents,embeddings)
+    #temporary=FAISS.from_documents(documents,embeddings)
    
-    data_base.merge_from(temporary)
-    
-  
+    #data_base.merge_from(temporary)
+    #documents=text_splitter.split_documents(documents)
+    ids=vector_data_base.add_documents(documents)
+    print("added data")
 
-    return data_base
+    
+    return ids
     
 
-async def add_tables(ticker, title, data, data_base):
+async def add_tables(ticker, title, data):
     documents=[]
-    
+    global vector_data_base
    
     document=Document(
         page_content=f"{title} of {ticker} is this table: {data}",
@@ -222,18 +215,19 @@ async def add_tables(ticker, title, data, data_base):
                     "ticker": ticker},
     )
     documents.append(document)
-    temporary=FAISS.from_documents(documents,embeddings)
-    data_base.merge_from(temporary)
+    #documents=text_splitter.split_documents(documents)
+    #temporary=FAISS.from_documents(documents,embeddings)
+    #data_base.merge_from(temporary)
+    ids=vector_data_base.add_documents(documents)
+    print("added tables")
 
+    return ids
+
+
+async def delete_data(ids):
     
-    return data_base
-
-
-async def delete_data(stock, data_base):
-   
-  
-    
-    db_dict=data_base.docstore._dict
+    global vector_data_base
+    '''db_dict=vector_data_base.docstore._dict
     delete=set()
     for key in db_dict.keys():
         print(db_dict[key].metadata["ticker"])
@@ -241,22 +235,32 @@ async def delete_data(stock, data_base):
             print(db_dict[key].metadata["ticker"],"matches this", stock)
             delete.add(key)
     data_base.delete(list(delete))
-    refresh_retriever(data_base)
+    refresh_retriever(data_base)'''
+
+    vector_data_base.delete(ids)
     
-    return data_base
+    return 
 
 
 
-def is_rag_usefull(query, data_base):
-    results = data_base.similarity_search_with_relevance_scores(
-        f"{query}",
-        k=1,
+def is_rag_usefull(query):
+
+    global vector_data_base
+
+    results = vector_data_base.similarity_search_with_relevance_scores(
+        query,
+        k=4                                                                 
     )
+    context=[]
+
     for res, score in results:
-        
-        if score < 0.5:
-            return False
-        return True
+        if score > 0.79:
+            context.append(res)
+
+
+    if len(context)<2: #if more than half of the results have low relevance to the prompt, then we don't have much data for the
+        return False, context
+    return True, context
 ##Return type of similarity_search_with_score():
 ##List[Tuple[Document, float]]
 ##float>=0 and <=1, the closer to 0 the less similar it is
