@@ -6,4 +6,4 @@
 
 -Data is retrieved from vector database with a relevence score to make sure query is relevant or can be answered by data in the vector database. If not, it returns a default message saving resources and time. 
 
--Docker was used to deploy on Azure, NLTK was downloaded during build process to cut down startup times. 
+-Docker was used to deploy on Azure.
